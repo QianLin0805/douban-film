@@ -152,9 +152,10 @@ export default {
         color: #999; font-size: 1.1rem; text-align: center; width: 100%; height: 3rem; line-height: 3rem;
         border-bottom: 1px solid #ddd; background: white;
         i{
-            display: inline-block; position: absolute; left: 0.5rem; top: 0;
+            display: inline-block; position: absolute; left: 0.5rem; top: 0; z-index: 1;
             width: 2rem; height: 3rem; line-height: 3rem;
         }
+        span{position: relative; z-index: 1;}
     }
 }
 .list{

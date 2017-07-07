@@ -6,10 +6,16 @@
             <br>
             <span>{{loadtip}}</span>
         </div>
-	    <header v-if="datas" :style="{background:headerBg}" ref="header"><i @click="back" class="icon-arrow_left"></i><span v-once>{{datas.title}}</span></header>
+	    <header v-if="datas" ref="header" :class="{bgHeader:bgFlag}">
+            <p v-show="bgFlag" :style="{background:imgColor}"></p>
+            <i @click="back" class="icon-arrow_left"></i><span v-once>{{datas.title}}</span>
+        </header>
         <div class="main" v-if="datas" ref="main">
             <div class="scroller">
-                <p class="post" :style="{background:imgColor}" ref="postwrap"><img :src="datas.images.large" alt="" ref="post"></p>
+                <div class="post" ref="postwrap">
+                    <p class="bg" :style="{background:imgColor}"></p>
+                    <img :src="datas.images.large" alt="" ref="post">
+                </div>
                 <div class="info mode">
                     <div class="score">豆瓣评分：<v-star :size="1" :gaprate="0.2" :score="datas.rating.average/2"></v-star>{{datas.rating.average}}分<span class="count">{{datas.ratings_count}}人评分</span></div>
                     <p>类型：{{datas.genres.join(' / ')}}</p>
@@ -18,14 +24,18 @@
                 </div>
                 <div class="summary mode">
                     <h3>剧情简介</h3>
-                    <p>{{datas.summary}}</p>
+                    <p :class="{hide:summaryFlag}">{{datas.summary}}</p>
+                    <span class="toggle" @click="toggle">展开</span>
                 </div>
                 <div class="casts mode">
                     <h3>影人</h3>
-                    <div class="wrap">
-                        <div class="scroller">
+                    <div class="wrap" ref="casts">
+                        <div class="scroller" :style="{width : castsWidth + 'px'}">
                             <ul>
-                                <li></li>
+                                <li v-for="item in casts">
+                                    <img :src="item.avatars.small" alt="">
+                                    <p class="name">{{item.name}}</p>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -56,14 +66,16 @@ export default {
     data(){
         return {
             maskFlag : true,
-            ajaxFlag : false,
+            summaryFlag : true,
+            bgFlag : false,
             link : 'https://api.douban.com/v2/movie/subject/' + this.$route.query.id,
             datas : '',
             imgColor : '',
-            headerBg : '',
             loadFaild : false,
             loadtip : '正在加载，请稍后~',
-            scroll : ''
+            scroll : '',
+            castScroll : '',
+            photoScroll : ''
         }
     },
     created(){
@@ -76,39 +88,75 @@ export default {
 
                 this.$nextTick(function(){
                     this.scroll = new Bscroll(this.$refs.main, {
+                        click : true,
                         scrollY : true,                               //可滚动方向
                         bounceTime : 900,                             //弹力动画持续时间，即滚动手感
                         probeType : 3
                     });
-                    this.scroll.on('scroll', () => {
-                        if(-this.scroll.y >= this.$refs.postwrap.clientHeight - this.$refs.header.clientHeight){
-                            this.headerBg = this.imgColor;
-                        }else{
-                            this.headerBg = this.imgColor.split('(').join('a(').split(')').join(',0.2)');
-                        }
-                    });
-                    RGBaster.colors(this.$refs.post, {
-                        paletteSize : 30,                  //调色板个数
+                    RGBaster.colors(this.$refs.post, {                //获取图片主色
+                        paletteSize : 30,                             //调色板个数
                         exclude : ['rgb(255,255,255)','rgb(0,0,0)'],
                         success : (result) => {
                             //console.log(result.dominant)   //主色
                             //console.log(result.secondary)  //次色
-                            this.imgColor = result.dominant.split('(').join('a(').split(')').join(',0.9)');
-                            this.headerBg = result.dominant.split('(').join('a(').split(')').join(',0.2)');
+                            this.imgColor = result.dominant.split('(').join('a(').split(')').join(',0.45)');
                         }
-                    })
+                    });
+                    this.scroll.on('scroll', () => {
+                        if(this.$refs.header && -this.scroll.y >= this.$refs.postwrap.clientHeight - this.$refs.header.clientHeight){
+                            this.bgFlag = true;
+                        }else{
+                            this.bgFlag = false;
+                        }
+                    });
                 });
             }
         });
     },
-    methods: {        
+    computed: {
+        casts(){
+            if(!this.datas) return;
+            let arr = [];
+            for(let i=0;i<this.datas.directors.length;i++){
+                arr.push(this.datas.directors[i]);
+            }
+            for(let i=0;i<this.datas.casts.length;i++){
+                arr.push(this.datas.casts[i]);
+            }
+            return arr;
+        },
+        castsWidth(){
+            if(!this.casts) return;
+            return this.casts.length * 60 + (this.casts.length - 1) * 5;
+        }
+    },
+    methods: {
         back(){
             if(this.ajaxFlag) return;
             window.history.back();
+        },
+        initScroll(obj,el){
+            let params = {
+                scrollX : true,                               //可滚动方向
+                bounceTime : 900,                             //弹力动画持续时间，即滚动手感
+                probeType : 3
+            }
+            obj = new Bscroll(el, params);
+        },
+        toggle(e){
+            this.summaryFlag = false;
+            e.target.remove();
+            this.$nextTick(function(){
+                this.scroll.refresh();
+            })
         }
     },
     watch: {
-        imgColor(val){
+        castsWidth(val,oldVal){
+            if(this.castScroll) return;
+            this.$nextTick(function(){
+                this.initScroll(this.castScroll, this.$refs.casts);
+            });
         }
     },
     components: {
@@ -122,13 +170,16 @@ export default {
     z-index: 333;
     header{
         position: absolute; left: 0; top: 0;
-        color: #fff; border: none;
+        color: #fff; border: none; background: none;
+        &.bgHeader{background: #666;}
+        p{position: absolute; left: 0; top: 0; width: 100%; height: 100%;}
     }
     .main{
         overflow: hidden; height: 100%;
         .post{
-            text-align: center; height: 16rem; padding: 4.5rem 0 1.5rem; background: #333;
-            img{height: 100%;}
+            position: relative; text-align: center; height: 16rem; padding: 4.5rem 0 1.5rem; background: #666;
+            p{position: absolute; left: 0; top: 0; width: 100%; height: 100%;}
+            img{position: relative; z-index: 1;height: 100%;}
         }
         .mode{
             padding-top: 1rem;
@@ -144,7 +195,23 @@ export default {
                 .count{color: #999; margin-left: 10px}
             }
         }
-        .summary p{font-size: 1rem; color: #333; line-height: 1.6rem;}
+        .summary{
+            overflow: hidden;
+            p{
+                font-size: 1rem; color: #333; line-height: 1.6rem;
+                &.hide{display:  -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;}
+            }
+            span{float: right; font-size: 1.05rem; color: #690; line-height: 2.4rem; padding-left: 10px;}
+        }
+        .casts ul{
+            overflow: hidden; width: 100%; height: 110px;
+            li{
+                float: left; width: 60px; height: 100%; margin-left: 5px;
+                &:first-child{margin-left: 0;}
+                img{width: 60px;}
+                p{overflow: hidden; font-size: 12px; color: #555; text-align: center; width: 100%; line-height: 24px; text-overflow: ellipsis; white-space: nowrap;}
+            }
+        }
         .ratings{
             overflow: hidden;
             .tab{
